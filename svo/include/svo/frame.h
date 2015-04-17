@@ -17,7 +17,7 @@
 #ifndef SVO_FRAME_H_
 #define SVO_FRAME_H_
 
-#include <sophus/se3.hpp>
+#include <sophus/se3.h>
 #include <vikit/math_utils.h>
 #include <vikit/abstract_camera.h>
 #include <boost/noncopyable.hpp>
