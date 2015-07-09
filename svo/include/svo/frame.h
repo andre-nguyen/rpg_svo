@@ -41,7 +41,7 @@ class Frame : boost::noncopyable
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    
+
   static int                    frame_counter_;         //!< Counts the number of created frames. Used to set the unique id.
   int                           id_;                    //!< Unique id of the frame.
   double                        timestamp_;             //!< Timestamp of when the image was recorded.
@@ -54,8 +54,13 @@ public:
   bool                          is_keyframe_;           //!< Was this frames selected as keyframe?
   g2oFrameSE3*                  v_kf_;                  //!< Temporary pointer to the g2o node object of the keyframe.
   int                           last_published_ts_;     //!< Timestamp of last publishing.
+  vk::AbstractCamera*           cam_right_;
+  cv::Mat                       img_right_;
+  double                        baseline_px_;
+  bool                          is_stereo_;
 
   Frame(vk::AbstractCamera* cam, const cv::Mat& img, double timestamp);
+  Frame(vk::AbstractCamera* cam_left, const cv::Mat& img_left, vk::AbstractCamera* cam_right, const cv::Mat &img_right, double baseline_px, double timestamp);
   ~Frame();
 
   /// Initialize new frame and create image pyramid.
@@ -86,6 +91,7 @@ public:
 
   /// Full resolution image stored in the frame.
   inline const cv::Mat& img() const { return img_pyr_[0]; }
+  inline const cv::Mat& img_right() const { return img_right_; }
 
   /// Was this frame selected as keyframe?
   inline bool isKeyframe() const { return is_keyframe_; }

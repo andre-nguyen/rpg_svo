@@ -1,7 +1,9 @@
 SET(PROJECT_NAME svo_ros)
 PROJECT(${PROJECT_NAME})
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.3)
-SET(CMAKE_BUILD_TYPE Release) # Release, RelWithDebInfo
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE Release)
+ENDIF()
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/CMakeModules/")
 
@@ -30,7 +32,7 @@ FIND_PACKAGE(catkin REQUIRED COMPONENTS
   vikit_ros
 )
 
-# Add plain cmake packages 
+# Add plain cmake packages
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Eigen REQUIRED)
 FIND_PACKAGE(Sophus REQUIRED)
@@ -55,7 +57,7 @@ INCLUDE_DIRECTORIES(
 )
 
 # Set link libraries
-LIST(APPEND LINK_LIBS 
+LIST(APPEND LINK_LIBS
   ${OpenCV_LIBS}
   ${Sophus_LIBRARIES}
   ${Boost_LIBRARIES}
@@ -65,9 +67,11 @@ LIST(APPEND LINK_LIBS
 # Create visualizer library
 ADD_LIBRARY(svo_visualizer src/visualizer.cpp)
 TARGET_LINK_LIBRARIES(svo_visualizer ${LINK_LIBS})
-                                 
-# Create Executables                      
+
+# Create Executables
 ADD_EXECUTABLE(vo src/vo_node.cpp)
 TARGET_LINK_LIBRARIES(vo svo_visualizer)
+ADD_EXECUTABLE(stereo_vo src/stereo_vo_node.cpp)
+TARGET_LINK_LIBRARIES(stereo_vo svo_visualizer)
 ADD_EXECUTABLE(benchmark src/benchmark_node.cpp)
 TARGET_LINK_LIBRARIES(benchmark svo_visualizer)

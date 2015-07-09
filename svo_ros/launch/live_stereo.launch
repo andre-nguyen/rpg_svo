@@ -1,0 +1,27 @@
+<launch>
+  <arg name="stereo" default="stereo"/>
+  <arg name="left" default="$(arg stereo)/left"/>
+  <arg name="right" default="$(arg stereo)/right"/>
+  <arg name="image" default="image_rect"/>
+
+  <!-- image_proc -->
+  <node pkg="stereo_image_proc" type="stereo_image_proc"
+    name="stereo_image_proc" ns="$(arg stereo)"/>
+
+  <!-- SVO -->
+  <node pkg="svo_ros" type="stereo_vo" name="svo"
+    clear_params="true" output="screen">
+
+    <param name="publish_dense_input" type="bool" value="true"/>
+    <param name="publish_markers" type="bool" value="true"/>
+
+    <!--<param name="~image_transport" value="compressed"/>-->
+    <!-- remapping -->
+    <remap from="~left" to="$(arg left)"/>
+    <remap from="~right" to="$(arg right)"/>
+    <remap from="~left/image" to="$(arg left)/$(arg image)"/>
+    <remap from="~right/image" to="$(arg right)/$(arg image)"/>
+
+    <rosparam file="$(find svo_ros)/param/vo_accurate.yaml" />
+  </node>
+</launch>

@@ -35,9 +35,25 @@ Frame::Frame(vk::AbstractCamera* cam, const cv::Mat& img, double timestamp) :
     cam_(cam),
     key_pts_(5),
     is_keyframe_(false),
-    v_kf_(NULL)
+    v_kf_(NULL),
+    is_stereo_(false)
 {
   initFrame(img);
+}
+
+Frame::Frame(vk::AbstractCamera* cam_left, const cv::Mat& img_left, vk::AbstractCamera* cam_right, const cv::Mat &img_right, double baseline_px, double timestamp) :
+    id_(frame_counter_++),
+    timestamp_(timestamp),
+    cam_(cam_left),
+    key_pts_(5),
+    is_keyframe_(false),
+    v_kf_(NULL),
+    cam_right_(cam_right),
+    img_right_(img_right),
+    baseline_px_(baseline_px),
+    is_stereo_(true)
+{
+  initFrame(img_left);
 }
 
 Frame::~Frame()

@@ -39,6 +39,7 @@ class Frame;
 class Point;
 class Map;
 class FrameHandlerMono;
+class FrameHandlerStereo;
 
 typedef boost::shared_ptr<Frame> FramePtr;
 
@@ -54,6 +55,7 @@ public:
   ros::Publisher pub_frames_;
   ros::Publisher pub_points_;
   ros::Publisher pub_pose_;
+  ros::Publisher pub_odom_;
   ros::Publisher pub_info_;
   ros::Publisher pub_dense_;
   image_transport::Publisher pub_images_;
@@ -71,6 +73,12 @@ public:
       const cv::Mat& img,
       const FramePtr& frame,
       const FrameHandlerMono& slam,
+      const double timestamp);
+
+  void publishMinimal(
+      const cv::Mat& img,
+      const FramePtr& frame,
+      const FrameHandlerStereo& slam,
       const double timestamp);
 
   void visualizeMarkers(

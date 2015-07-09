@@ -134,6 +134,12 @@ public:
       const double z,
       const double px_error_angle);
 
+  /// Use stereo matching to get depths of features
+  static bool getStereoDepths(const FramePtr &frame,
+                              const Features &features,
+                              vector<double> &depths,
+                              vector<double> &depth_errors);
+
 protected:
   feature_detection::DetectorPtr feature_detector_;
   callback_t seed_converged_cb_;

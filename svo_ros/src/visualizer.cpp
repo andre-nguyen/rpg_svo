@@ -16,6 +16,7 @@
 
 #include <svo_ros/visualizer.h>
 #include <svo/frame_handler_mono.h>
+#include <svo/frame_handler_stereo.h>
 #include <svo/frame.h>
 #include <svo/point.h>
 #include <svo/map.h>
@@ -53,6 +54,7 @@ Visualizer() :
   pub_frames_ = pnh_.advertise<visualization_msgs::Marker>("keyframes", 10);
   pub_points_ = pnh_.advertise<visualization_msgs::Marker>("points", 1000);
   pub_pose_ = pnh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose",10);
+  pub_odom_ = pnh_.advertise<nav_msgs::Odometry>("odom",10);
   pub_info_ = pnh_.advertise<svo_msgs::Info>("info", 10);
   pub_dense_ = pnh_.advertise<svo_msgs::DenseInput>("dense_input",10);
 
@@ -113,17 +115,143 @@ void Visualizer::publishMinimal(
     cv::Mat img_rgb(frame->img_pyr_[img_pub_level_].size(), CV_8UC3);
     cv::cvtColor(frame->img_pyr_[img_pub_level_], img_rgb, CV_GRAY2RGB);
 
-    if(slam.stage() == FrameHandlerBase::STAGE_SECOND_FRAME)
+    if(img_pub_level_ == 0)
     {
-      // During initialization, draw lines.
-      const vector<cv::Point2f>& px_ref(slam.initFeatureTrackRefPx());
-      const vector<cv::Point2f>& px_cur(slam.initFeatureTrackCurPx());
-      for(vector<cv::Point2f>::const_iterator it_ref=px_ref.begin(), it_cur=px_cur.begin();
-          it_ref != px_ref.end(); ++it_ref, ++it_cur)
-        cv::line(img_rgb,
-                 cv::Point2f(it_cur->x/scale, it_cur->y/scale),
-                 cv::Point2f(it_ref->x/scale, it_ref->y/scale), cv::Scalar(0,255,0), 2);
+      for(Features::iterator it=frame->fts_.begin(); it!=frame->fts_.end(); ++it)
+      {
+        if((*it)->type == Feature::EDGELET)
+          cv::line(img_rgb,
+                   cv::Point2f((*it)->px[0]+3*(*it)->grad[1], (*it)->px[1]-3*(*it)->grad[0]),
+                   cv::Point2f((*it)->px[0]-3*(*it)->grad[1], (*it)->px[1]+3*(*it)->grad[0]),
+                   cv::Scalar(255,0,255), 2);
+        else
+          cv::rectangle(img_rgb,
+                        cv::Point2f((*it)->px[0]-2, (*it)->px[1]-2),
+                        cv::Point2f((*it)->px[0]+2, (*it)->px[1]+2),
+                        cv::Scalar(0,255,0), CV_FILLED);
+      }
     }
+    if(img_pub_level_ == 1)
+      for(Features::iterator it=frame->fts_.begin(); it!=frame->fts_.end(); ++it)
+        cv::rectangle(img_rgb,
+                      cv::Point2f((*it)->px[0]/scale-1, (*it)->px[1]/scale-1),
+                      cv::Point2f((*it)->px[0]/scale+1, (*it)->px[1]/scale+1),
+                      cv::Scalar(0,255,0), CV_FILLED);
+    else
+      for(Features::iterator it=frame->fts_.begin(); it!=frame->fts_.end(); ++it)
+        cv::rectangle(img_rgb,
+                      cv::Point2f((*it)->px[0]/scale, (*it)->px[1]/scale),
+                      cv::Point2f((*it)->px[0]/scale, (*it)->px[1]/scale),
+                      cv::Scalar(0,255,0), CV_FILLED);
+
+    cv_bridge::CvImage img_msg;
+    img_msg.header = header_msg;
+    img_msg.image = img_rgb;
+    img_msg.encoding = sensor_msgs::image_encodings::BGR8;
+    pub_images_.publish(img_msg.toImageMsg());
+  }
+
+  if(slam.stage() == FrameHandlerBase::STAGE_DEFAULT_FRAME)
+  {
+    Quaterniond q;
+    Vector3d p;
+    Matrix<double,6,6> Cov;
+    if(publish_world_in_cam_frame_)
+    {
+      // publish world in cam frame
+      SE3 T_cam_from_world(frame->T_f_w_* T_world_from_vision_);
+      q = Quaterniond(T_cam_from_world.rotation_matrix());
+      p = T_cam_from_world.translation();
+      Cov = frame->Cov_;
+    }
+    else
+    {
+      // publish cam in world frame
+      SE3 T_world_from_cam(T_world_from_vision_*frame->T_f_w_.inverse());
+      q = Quaterniond((T_world_from_cam.rotation_matrix()*T_world_from_vision_.rotation_matrix().transpose()).eval());
+      p = T_world_from_cam.translation();
+      Cov = T_world_from_cam.Adj()*frame->Cov_*T_world_from_cam.inverse().Adj();
+    }
+    geometry_msgs::PoseWithCovarianceStampedPtr msg_pose(new geometry_msgs::PoseWithCovarianceStamped);
+    msg_pose->header = header_msg;
+    msg_pose->pose.pose.position.x = p[0];
+    msg_pose->pose.pose.position.y = p[1];
+    msg_pose->pose.pose.position.z = p[2];
+    msg_pose->pose.pose.orientation.x = q.x();
+    msg_pose->pose.pose.orientation.y = q.y();
+    msg_pose->pose.pose.orientation.z = q.z();
+    msg_pose->pose.pose.orientation.w = q.w();
+    for(size_t i=0; i<36; ++i)
+      msg_pose->pose.covariance[i] = Cov(i%6, i/6);
+    pub_pose_.publish(msg_pose);
+
+    nav_msgs::OdometryPtr msg_odom(new nav_msgs::Odometry);
+    msg_odom->header = header_msg;
+    msg_odom->child_frame_id = "cam";
+    msg_odom->pose.pose.position.x = p[0];
+    msg_odom->pose.pose.position.y = p[1];
+    msg_odom->pose.pose.position.z = p[2];
+    msg_odom->pose.pose.orientation.x = q.x();
+    msg_odom->pose.pose.orientation.y = q.y();
+    msg_odom->pose.pose.orientation.z = q.z();
+    msg_odom->pose.pose.orientation.w = q.w();
+    for(size_t i=0; i<36; ++i)
+      msg_odom->pose.covariance[i] = Cov(i%6, i/6);
+    pub_odom_.publish(msg_odom);
+  }
+}
+
+void Visualizer::publishMinimal(
+    const cv::Mat& img,
+    const FramePtr& frame,
+    const FrameHandlerStereo& slam,
+    const double timestamp)
+{
+  ++trace_id_;
+  std_msgs::Header header_msg;
+  header_msg.frame_id = "/cam";
+  header_msg.seq = trace_id_;
+  header_msg.stamp = ros::Time(timestamp);
+
+  // publish info msg.
+  if(pub_info_.getNumSubscribers() > 0)
+  {
+    svo_msgs::Info msg_info;
+    msg_info.header = header_msg;
+    msg_info.processing_time = slam.lastProcessingTime();
+    msg_info.keyframes.resize(slam.map().keyframes_.size());
+    for(list<FramePtr>::const_iterator it=slam.map().keyframes_.begin(); it!=slam.map().keyframes_.end(); ++it)
+      msg_info.keyframes.push_back((*it)->id_);
+    msg_info.stage = static_cast<int>(slam.stage());
+    msg_info.tracking_quality = static_cast<int>(slam.trackingQuality());
+    if(frame != NULL)
+      msg_info.num_matches = slam.lastNumObservations();
+    else
+      msg_info.num_matches = 0;
+    pub_info_.publish(msg_info);
+  }
+
+  if(frame == NULL)
+  {
+    if(pub_images_.getNumSubscribers() > 0 && slam.stage() == FrameHandlerBase::STAGE_PAUSED)
+    {
+      // Display image when slam is not running.
+      cv_bridge::CvImage img_msg;
+      img_msg.header.stamp = ros::Time::now();
+      img_msg.header.frame_id = "/image";
+      img_msg.image = img;
+      img_msg.encoding = sensor_msgs::image_encodings::MONO8;
+      pub_images_.publish(img_msg.toImageMsg());
+    }
+    return;
+  }
+
+  // Publish pyramid-image every nth-frame.
+  if(img_pub_nth_ > 0 && trace_id_%img_pub_nth_ == 0 && pub_images_.getNumSubscribers() > 0)
+  {
+    const int scale = (1<<img_pub_level_);
+    cv::Mat img_rgb(frame->img_pyr_[img_pub_level_].size(), CV_8UC3);
+    cv::cvtColor(frame->img_pyr_[img_pub_level_], img_rgb, CV_GRAY2RGB);
 
     if(img_pub_level_ == 0)
     {
@@ -161,7 +289,7 @@ void Visualizer::publishMinimal(
     pub_images_.publish(img_msg.toImageMsg());
   }
 
-  if(pub_pose_.getNumSubscribers() > 0 && slam.stage() == FrameHandlerBase::STAGE_DEFAULT_FRAME)
+  if(slam.stage() == FrameHandlerBase::STAGE_DEFAULT_FRAME)
   {
     Quaterniond q;
     Vector3d p;
@@ -178,7 +306,7 @@ void Visualizer::publishMinimal(
     {
       // publish cam in world frame
       SE3 T_world_from_cam(T_world_from_vision_*frame->T_f_w_.inverse());
-      q = Quaterniond(T_world_from_cam.rotation_matrix()*T_world_from_vision_.rotation_matrix().transpose());
+      q = Quaterniond((T_world_from_cam.rotation_matrix()*T_world_from_vision_.rotation_matrix().transpose()).eval());
       p = T_world_from_cam.translation();
       Cov = T_world_from_cam.Adj()*frame->Cov_*T_world_from_cam.inverse().Adj();
     }
@@ -194,6 +322,20 @@ void Visualizer::publishMinimal(
     for(size_t i=0; i<36; ++i)
       msg_pose->pose.covariance[i] = Cov(i%6, i/6);
     pub_pose_.publish(msg_pose);
+
+    nav_msgs::OdometryPtr msg_odom(new nav_msgs::Odometry);
+    msg_odom->header = header_msg;
+    msg_odom->child_frame_id = "cam";
+    msg_odom->pose.pose.position.x = p[0];
+    msg_odom->pose.pose.position.y = p[1];
+    msg_odom->pose.pose.position.z = p[2];
+    msg_odom->pose.pose.orientation.x = q.x();
+    msg_odom->pose.pose.orientation.y = q.y();
+    msg_odom->pose.pose.orientation.z = q.z();
+    msg_odom->pose.pose.orientation.w = q.w();
+    for(size_t i=0; i<36; ++i)
+      msg_odom->pose.covariance[i] = Cov(i%6, i/6);
+    pub_odom_.publish(msg_odom);
   }
 }
 
