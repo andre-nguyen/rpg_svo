@@ -281,7 +281,7 @@ void MapPointCandidates::deleteCandidate(PointCandidate& c)
 {
   // camera-rig: another frame might still be pointing to the candidate point
   // therefore, we can't delete it right now.
-  delete c.second; c.second=NULL;
+  delete c.second; //c.second=NULL;
   c.first->type_ = Point::TYPE_DELETED;
   trash_points_.push_back(c.first);
 }

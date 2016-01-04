@@ -55,7 +55,6 @@ public:
       const sensor_msgs::Image::ConstPtr &r_image_msg,
       const sensor_msgs::CameraInfo::ConstPtr &l_cinfo_msg,
       const sensor_msgs::CameraInfo::ConstPtr &r_cinfo_msg);
-  void processUserActions();
   void remoteKeyCb(const std_msgs::StringConstPtr& key_input);
 
 };
@@ -108,7 +107,7 @@ void StereoVoNode::imageCallback(
   }
 
   //  configure camera calibration
-  if (!l_cam_) {
+  if (!vo_) {
     //  assume these parameters will not change throughout the odometry
     image_geometry::StereoCameraModel mdl;
     if (!mdl.fromCameraInfo(l_cinfo_msg, r_cinfo_msg)) {
@@ -130,7 +129,6 @@ void StereoVoNode::imageCallback(
     vo_->start();
   }
 
-  processUserActions();
   const FrameHandlerBase::AddImageResult res =
       vo_->addImages(l_img, r_img, l_image_msg->header.stamp.toSec());
 
@@ -145,36 +143,6 @@ void StereoVoNode::imageCallback(
 
   if(vo_->stage() == FrameHandlerStereo::STAGE_PAUSED)
     usleep(100000);
-}
-
-void StereoVoNode::processUserActions()
-{
-  char input = remote_input_.c_str()[0];
-  remote_input_ = "";
-
-  if(user_input_thread_ != NULL)
-  {
-    char console_input = user_input_thread_->getInput();
-    if(console_input != 0)
-      input = console_input;
-  }
-
-  switch(input)
-  {
-    case 'q':
-      quit_ = true;
-      printf("SVO user input: QUIT\n");
-      break;
-    case 'r':
-      vo_->reset();
-      printf("SVO user input: RESET\n");
-      break;
-    case 's':
-      vo_->start();
-      printf("SVO user input: START\n");
-      break;
-    default: ;
-  }
 }
 
 void StereoVoNode::remoteKeyCb(const std_msgs::StringConstPtr& key_input)
@@ -199,12 +167,6 @@ int main(int argc, char **argv)
   stereo_vo_node.sub_remote_key_ = nh.subscribe("svo/remote_key", 5, &svo::StereoVoNode::remoteKeyCb, &stereo_vo_node);
 
   ros::spin();
-  // start processing callbacks
-  while(ros::ok() && !stereo_vo_node.quit_)
-  {
-    ros::spinOnce();
-    // TODO check when last image was processed. when too long ago. publish warning that no msgs are received!
-  }
 
   printf("SVO terminated.\n");
   return 0;

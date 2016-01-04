@@ -16,14 +16,11 @@
 
 #include <svo/config.h>
 #include <svo/frame_handler_stereo.h>
-#include <svo/initialization.h>
-#include <svo/map.h>
 #include <svo/frame.h>
 #include <svo/feature.h>
 #include <svo/point.h>
 #include <svo/pose_optimizer.h>
 #include <svo/sparse_img_align.h>
-#include <vikit/performance_monitor.h>
 #include <svo/depth_filter.h>
 
 #ifdef USE_BUNDLE_ADJUSTMENT
@@ -111,9 +108,9 @@ FrameHandlerBase::AddImageResult FrameHandlerStereo::addImages(
   return ai_res;
 }
 
-FrameHandlerStereo::UpdateResult FrameHandlerStereo::processFirstFrame(const SE3 &T_cur_ref)
+FrameHandlerStereo::UpdateResult FrameHandlerStereo::processFirstFrame(const SE3 &T_cur)
 {
-  new_frame_->T_f_w_ = T_cur_ref;
+  new_frame_->T_f_w_ = T_cur;
   // vector<cv::Point2f> px_left;
   // initialization::detectFeatures(new_left_frame_, px_left_, f_left_);
   Features new_features;
@@ -147,7 +144,7 @@ FrameHandlerStereo::UpdateResult FrameHandlerStereo::processFirstFrame(const SE3
   }
   double depth_mean = vk::getMedian(depth_vec);
 
-  // For each inlier create 3D point and add feature in both frames
+  // For each inlier create 3D point and add feature in keyframe
   const SE3 T_world_cur = new_frame_->T_f_w_.inverse();
   int idx = 0;
   for(auto &ftr : new_features)
@@ -354,15 +351,6 @@ void FrameHandlerStereo::resetAll()
   core_kfs_.clear();
   overlap_kfs_.clear();
   depth_filter_->reset();
-}
-
-void FrameHandlerStereo::setFirstFrame(const FramePtr &first_frame)
-{
-  resetAll();
-  last_frame_ = first_frame;
-  last_frame_->setKeyframe();
-  map_.addKeyframe(last_frame_);
-  stage_ = STAGE_DEFAULT_FRAME;
 }
 
 bool FrameHandlerStereo::needNewKf(double scene_depth_mean)

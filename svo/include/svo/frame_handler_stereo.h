@@ -36,9 +36,6 @@ public:
   /// Provide a stereo pair
   AddImageResult addImages(const cv::Mat& img_left, const cv::Mat& img_right, double timestamp);
 
-  /// Set the first frame (used for synthetic datasets in benchmark node)
-  void setFirstFrame(const FramePtr& first_frame);
-
   /// Get the last frame that has been processed.
   FramePtr lastFrame() { return last_frame_; }
 
@@ -70,7 +67,7 @@ protected:
   virtual void initialize();
 
   /// Processes the first frame and sets it as a keyframe.
-  virtual UpdateResult processFirstFrame(const SE3 &T_cur_ref);
+  virtual UpdateResult processFirstFrame(const SE3 &T_cur);
 
   /// Processes all frames after the first frame until a keyframe is selected.
   //virtual UpdateResult processSecondFrame();

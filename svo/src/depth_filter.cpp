@@ -24,12 +24,9 @@
 #include <boost/math/distributions/normal.hpp>
 #include <svo/global.h>
 #include <svo/depth_filter.h>
-#include <svo/frame.h>
 #include <svo/point.h>
 #include <svo/feature.h>
-#include <svo/matcher.h>
 #include <svo/config.h>
-#include <svo/feature_detection.h>
 
 namespace svo
 {
@@ -193,7 +190,7 @@ void DepthFilter::updateSeedsLoop()
     FramePtr frame;
     {
       lock_t lock(frame_queue_mut_);
-      while(frame_queue_.empty() && new_keyframe_set_ == false)
+      while(frame_queue_.empty() && !new_keyframe_set_)
         frame_queue_cond_.wait(lock);
       if(new_keyframe_set_)
       {
@@ -347,17 +344,17 @@ void DepthFilter::updateSeed(const float x, const float tau2, Seed *seed)
   if(std::isnan(norm_scale))
     return;
   boost::math::normal_distribution<float> nd(seed->mu, norm_scale);
-  float s2 = 1. / (1. / seed->sigma2 + 1. / tau2);
+  float s2 = 1.0f / (1.0f / seed->sigma2 + 1.0f / tau2);
   float m = s2 * (seed->mu / seed->sigma2 + x / tau2);
   float C1 = seed->a / (seed->a + seed->b) * boost::math::pdf(nd, x);
-  float C2 = seed->b / (seed->a + seed->b) * 1. / seed->z_range;
+  float C2 = seed->b / (seed->a + seed->b) * 1.0f / seed->z_range;
   float normalization_constant = C1 + C2;
   C1 /= normalization_constant;
   C2 /= normalization_constant;
-  float f = C1 * (seed->a + 1.) / (seed->a + seed->b + 1.) +
-            C2 * seed->a / (seed->a + seed->b + 1.);
-  float e = C1 * (seed->a + 1.) * (seed->a + 2.) /
-                ((seed->a + seed->b + 1.) * (seed->a + seed->b + 2.)) +
+  float f = C1 * (seed->a + 1.0f) / (seed->a + seed->b + 1.0f) +
+            C2 * seed->a / (seed->a + seed->b + 1.0f);
+  float e = C1 * (seed->a + 1.0f) * (seed->a + 2.0f) /
+                ((seed->a + seed->b + 1.0f) * (seed->a + seed->b + 2.0f)) +
             C2 * seed->a * (seed->a + 1.0f) /
                 ((seed->a + seed->b + 1.0f) * (seed->a + seed->b + 2.0f));
 
