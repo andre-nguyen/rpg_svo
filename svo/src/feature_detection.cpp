@@ -77,15 +77,15 @@ void FastDetector::detect(
 #if __SSE2__
       fast::fast_corner_detect_10_sse2(
           (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
-          img_pyr[L].rows, img_pyr[L].cols, 5, fast_corners);
+          img_pyr[L].rows, img_pyr[L].cols, 10, fast_corners);
 #elif HAVE_FAST_NEON
       fast::fast_corner_detect_9_neon(
           (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
-          img_pyr[L].rows, img_pyr[L].cols, 5, fast_corners);
+          img_pyr[L].rows, img_pyr[L].cols, 10, fast_corners);
 #else
       fast::fast_corner_detect_10(
           (fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols,
-          img_pyr[L].rows, img_pyr[L].cols, 5, fast_corners);
+          img_pyr[L].rows, img_pyr[L].cols, 10, fast_corners);
 #endif
     vector<int> scores, nm_corners;
     fast::fast_corner_score_10((fast::fast_byte*) img_pyr[L].data, img_pyr[L].cols, fast_corners, 5, scores);
