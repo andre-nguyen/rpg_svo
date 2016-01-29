@@ -1,0 +1,33 @@
+<launch>
+
+  <arg name="ns" default="/sync"/>
+  <arg name="left_cam" default="$(arg ns)/cam0"/>
+  <arg name="right_cam" default="$(arg ns)/cam1"/>
+  <arg name="image" default="image_rect"/>
+
+  <node pkg="stereo_image_proc" name="stereo_image_proc" type="stereo_image_proc"
+    ns="$(arg ns)">
+    <remap from="left/image_raw" to="$(arg left_cam)/image_raw"/>
+    <remap from="left/camera_info" to="$(arg left_cam)/camera_info"/>
+    <remap from="right/image_raw" to="$(arg right_cam)/image_raw"/>
+    <remap from="right/camera_info" to="$(arg right_cam)/camera_info"/>
+  </node>
+
+  <!-- SVO -->
+  <node pkg="svo_ros" type="stereo_vo" name="svo"
+    clear_params="true" output="screen">
+
+    <param name="publish_dense_input" type="bool" value="false"/>
+    <param name="publish_markers" type="bool" value="true"/>
+
+    <!--<param name="~image_transport" value="compressed"/>-->
+    <!-- remapping -->
+    <remap from="~left" to="$(arg left_cam)"/>
+    <remap from="~right" to="$(arg right_cam)"/>
+    <remap from="~left/image" to="$(arg ns)/left/$(arg image)"/>
+    <remap from="~right/image" to="$(arg ns)/right/$(arg image)"/>
+    <!--<remap from="~image_output" to="image_out"/>-->
+
+    <rosparam file="$(find svo_ros)/param/vo_accurate.yaml" />
+  </node>
+</launch>
