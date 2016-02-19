@@ -115,6 +115,18 @@ void Visualizer::publishMinimal(
     cv::Mat img_rgb(frame->img_pyr_[img_pub_level_].size(), CV_8UC3);
     cv::cvtColor(frame->img_pyr_[img_pub_level_], img_rgb, CV_GRAY2RGB);
 
+    if(slam.stage() == FrameHandlerBase::STAGE_SECOND_FRAME)
+    {
+      // During initialization, draw lines.
+      const vector<cv::Point2f>& px_ref(slam.initFeatureTrackRefPx());
+      const vector<cv::Point2f>& px_cur(slam.initFeatureTrackCurPx());
+      for(vector<cv::Point2f>::const_iterator it_ref=px_ref.begin(), it_cur=px_cur.begin();
+          it_ref != px_ref.end(); ++it_ref, ++it_cur)
+        cv::line(img_rgb,
+                 cv::Point2f(it_cur->x/scale, it_cur->y/scale),
+                 cv::Point2f(it_ref->x/scale, it_ref->y/scale), cv::Scalar(0,255,0), 2);
+    }
+
     if(img_pub_level_ == 0)
     {
       for(Features::iterator it=frame->fts_.begin(); it!=frame->fts_.end(); ++it)
@@ -174,6 +186,7 @@ void Visualizer::publishMinimal(
     }
     geometry_msgs::PoseWithCovarianceStampedPtr msg_pose(new geometry_msgs::PoseWithCovarianceStamped);
     msg_pose->header = header_msg;
+    msg_pose->header.frame_id = publish_world_in_cam_frame_ ? "/cam" : "/world";
     msg_pose->pose.pose.position.x = p[0];
     msg_pose->pose.pose.position.y = p[1];
     msg_pose->pose.pose.position.z = p[2];
@@ -187,7 +200,8 @@ void Visualizer::publishMinimal(
 
     nav_msgs::OdometryPtr msg_odom(new nav_msgs::Odometry);
     msg_odom->header = header_msg;
-    msg_odom->child_frame_id = "cam";
+    msg_pose->header.frame_id = publish_world_in_cam_frame_ ? "/cam" : "/world";
+    msg_odom->child_frame_id = publish_world_in_cam_frame_ ? "/world" : "/cam";
     msg_odom->pose.pose.position.x = p[0];
     msg_odom->pose.pose.position.y = p[1];
     msg_odom->pose.pose.position.z = p[2];
@@ -222,7 +236,7 @@ void Visualizer::publishMinimal(
     svo_msgs::Info msg_info;
     msg_info.header = header_msg;
     msg_info.processing_time = slam.lastProcessingTime();
-    msg_info.keyframes.resize(slam.map().keyframes_.size());
+    msg_info.keyframes.reserve(slam.map().keyframes_.size());
     for(list<FramePtr>::const_iterator it=slam.map().keyframes_.begin(); it!=slam.map().keyframes_.end(); ++it)
       msg_info.keyframes.push_back((*it)->id_);
     msg_info.stage = static_cast<int>(slam.stage());
